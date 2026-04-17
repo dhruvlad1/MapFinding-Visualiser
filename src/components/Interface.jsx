@@ -20,13 +20,9 @@ import {
   InputLabel,
   FormControl,
   Menu,
-  Backdrop,
-  Stepper,
-  Step,
-  StepLabel,
 } from "@mui/material";
 import { MuiColorInput } from "mui-color-input";
-import { PlayArrow, Settings, Movie, Pause, Replay } from "@mui/icons-material";
+import { PlayArrow, Settings, Pause, Replay } from "@mui/icons-material";
 import Slider from "./Slider";
 import { INITIAL_COLORS, LOCATIONS } from "../config";
 import { arrayToRgb, rgbToArray } from "../helpers";
@@ -44,12 +40,10 @@ const Interface = forwardRef(
       colors,
       loading,
       timeChanged,
-      cinematic,
       placeEnd,
       changeRadius,
       changeAlgorithm,
       setPlaceEnd,
-      setCinematic,
       setSettings,
       setColors,
       startPathfinding,
@@ -65,12 +59,8 @@ const Interface = forwardRef(
       message: "",
       type: "error",
     });
-    const [showTutorial, setShowTutorial] = useState(false);
-    const [activeStep, setActiveStep] = useState(0);
-    const [helper, setHelper] = useState(false);
     const [menuAnchor, setMenuAnchor] = useState(null);
     const menuOpen = Boolean(menuAnchor);
-    const helperTime = useRef(4800);
     const rightDown = useRef(false);
     const leftDown = useRef(false);
 
@@ -83,19 +73,6 @@ const Interface = forwardRef(
 
     function closeSnack() {
       setSnack({ ...snack, open: false });
-    }
-
-    function closeHelper() {
-      setHelper(false);
-    }
-
-    function handleTutorialChange(direction) {
-      if (activeStep >= 2 && direction > 0) {
-        setShowTutorial(false);
-        return;
-      }
-
-      setActiveStep(Math.max(activeStep + direction, 0));
     }
 
     // Start pathfinding or toggle playback
@@ -133,8 +110,7 @@ const Interface = forwardRef(
     };
 
     window.onkeyup = (e) => {
-      if (e.code === "Escape") setCinematic(false);
-      else if (e.code === "Space") {
+      if (e.code === "Space") {
         e.preventDefault();
         handlePlay();
       } else if (e.code === "ArrowRight" && rightDown.current) {
@@ -146,24 +122,9 @@ const Interface = forwardRef(
       } else if (e.code === "KeyR" && (animationEnded || !started)) clearPath();
     };
 
-    // Show cinematic mode helper
-    useEffect(() => {
-      if (!cinematic) return;
-      setHelper(true);
-      setTimeout(() => {
-        helperTime.current = 2500;
-      }, 200);
-    }, [cinematic]);
-
-    useEffect(() => {
-      if (localStorage.getItem("path_sawtutorial")) return;
-      setShowTutorial(true);
-      localStorage.setItem("path_sawtutorial", true);
-    }, []);
-
     return (
       <>
-        <div className={`nav-top ${cinematic ? "cinematic" : ""}`}>
+        <div className="nav-top">
           <div className="side slider-container">
             <Typography id="playback-slider" gutterBottom>
               Animation playback
@@ -215,7 +176,7 @@ const Interface = forwardRef(
           </div>
         </div>
 
-        <div className={`point-controls ${cinematic ? "cinematic" : ""}`}>
+        <div className="point-controls">
           <Button
             onClick={() => {
               setPlaceEnd(false);
@@ -250,7 +211,7 @@ const Interface = forwardRef(
           </Button>
         </div>
 
-        <div className={`nav-right ${cinematic ? "cinematic" : ""}`}>
+        <div className="nav-right">
           <Tooltip title="Open settings">
             <IconButton
               onClick={() => {
@@ -260,21 +221,6 @@ const Interface = forwardRef(
               size="large"
             >
               <Settings
-                style={{ color: "#fff", width: 24, height: 24 }}
-                fontSize="inherit"
-              />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Cinematic mode">
-            <IconButton
-              className="btn-cinematic"
-              onClick={() => {
-                setCinematic(!cinematic);
-              }}
-              style={{ backgroundColor: "#2A2B37", width: 36, height: 36 }}
-              size="large"
-            >
-              <Movie
                 style={{ color: "#fff", width: 24, height: 24 }}
                 fontSize="inherit"
               />
@@ -309,23 +255,6 @@ const Interface = forwardRef(
           </Alert>
         </Snackbar>
 
-        <Snackbar
-          anchorOrigin={{ vertical: "top", horizontal: "center" }}
-          open={helper}
-          autoHideDuration={helperTime.current}
-          onClose={closeHelper}
-        >
-          <div className="cinematic-alert">
-            <Typography fontSize="18px">
-              <b>Cinematic mode</b>
-            </Typography>
-            <Typography>Use keyboard shortcuts to control animation</Typography>
-            <Typography>
-              Press <b>Escape</b> to exit
-            </Typography>
-          </div>
-        </Snackbar>
-
         <div className="mobile-controls">
           <Button
             onClick={() => {
@@ -357,117 +286,8 @@ const Interface = forwardRef(
           </Button>
         </div>
 
-        <Backdrop
-          open={showTutorial}
-          onClick={(e) => {
-            if (e.target.classList.contains("backdrop")) setShowTutorial(false);
-          }}
-          className="backdrop"
-        >
-          <div className="tutorial-container">
-            <Stepper activeStep={activeStep}>
-              <Step>
-                <StepLabel>Basic controls</StepLabel>
-              </Step>
-              <Step>
-                <StepLabel>Playback controls</StepLabel>
-              </Step>
-              <Step>
-                <StepLabel>Changing settings</StepLabel>
-              </Step>
-            </Stepper>
-            <div className="content">
-              <h1>Map Pathfinding Visualizer</h1>
-              {activeStep === 0 && (
-                <div>
-                  <p>
-                    <b>Controls:</b> <br />
-                    Use <b>Select start point</b> and <b>Select end point</b>{" "}
-                    buttons, then click on map. <br />
-                  </p>
-                  <p>The end node must be placed within the shown radius.</p>
-                  <video className="video" autoPlay muted loop>
-                    <source src="/videos/tutorial1.mp4" type="video/mp4" />
-                  </video>
-                </div>
-              )}
-              {activeStep === 1 && (
-                <div>
-                  <p>
-                    To start the visualization, press the <b>Start Button</b> or
-                    press <b>Space</b>.<br />A playback feature is available
-                    after the algorithm ends.
-                  </p>
-                  <video className="video" autoPlay muted loop>
-                    <source src="/videos/tutorial2.mp4" type="video/mp4" />
-                  </video>
-                </div>
-              )}
-              {activeStep === 2 && (
-                <div>
-                  <p>
-                    You can customize the settings of the animation in the{" "}
-                    <b>Settings Sidebar</b>. <br />
-                    Try to keep the area radius only as large as you need it to
-                    be. <br />
-                    Anything above <b>10km</b> is considered experimental, if
-                    you run into performance issues, stop the animation and
-                    clear the path.
-                  </p>
-                  <video className="video" autoPlay muted loop>
-                    <source src="/videos/tutorial3.mp4" type="video/mp4" />
-                  </video>
-                </div>
-              )}
-            </div>
-            <div className="controls">
-              <Button
-                onClick={() => {
-                  setShowTutorial(false);
-                }}
-                className="close"
-                variant="outlined"
-                style={{
-                  borderColor: "#9f9f9f",
-                  color: "#9f9f9f",
-                  paddingInline: 15,
-                }}
-              >
-                Close
-              </Button>
-              <Button
-                onClick={() => {
-                  handleTutorialChange(-1);
-                }}
-                variant="outlined"
-                style={{
-                  borderColor: "#9f9f9f",
-                  color: "#9f9f9f",
-                  paddingInline: 18,
-                }}
-              >
-                Back
-              </Button>
-              <Button
-                onClick={() => {
-                  handleTutorialChange(1);
-                }}
-                variant="contained"
-                style={{
-                  backgroundColor: "#46B780",
-                  color: "#fff",
-                  paddingInline: 30,
-                  fontWeight: "bold",
-                }}
-              >
-                {activeStep >= 2 ? "Finish" : "Next"}
-              </Button>
-            </div>
-          </div>
-        </Backdrop>
-
         <Drawer
-          className={`side-drawer ${cinematic ? "cinematic" : ""}`}
+          className="side-drawer"
           anchor="left"
           open={sidebar}
           onClose={() => {
@@ -508,6 +328,10 @@ const Interface = forwardRef(
                 <MenuItem value={"bidirectional"}>
                   Bidirectional Search algorithm
                 </MenuItem>
+                <MenuItem value={"branchbound"}>
+                  Branch and Bound algorithm
+                </MenuItem>
+                <MenuItem value={"beamsearch"}>Beam Search algorithm</MenuItem>
               </Select>
             </FormControl>
 
@@ -612,6 +436,40 @@ const Interface = forwardRef(
                 style={{ marginBottom: 1 }}
               />
             </div>
+
+            {settings.algorithm === "beamsearch" && (
+              <div className="side slider-container">
+                <Typography id="beam-width-slider">
+                  Beam width: {settings.beamWidth}
+                </Typography>
+                <Slider
+                  disabled={started && !animationEnded}
+                  min={2}
+                  max={25}
+                  step={1}
+                  value={settings.beamWidth}
+                  onChange={(e) => {
+                    setSettings({
+                      ...settings,
+                      beamWidth: Number(e.target.value),
+                    });
+                  }}
+                  className="slider"
+                  aria-labelledby="beam-width-slider"
+                  style={{ marginBottom: 1 }}
+                  marks={[
+                    {
+                      value: 2,
+                      label: "2",
+                    },
+                    {
+                      value: 25,
+                      label: "25",
+                    },
+                  ]}
+                />
+              </div>
+            )}
 
             <div className="styles-container">
               <Typography
@@ -822,16 +680,6 @@ const Interface = forwardRef(
                 <p>Arrows</p>
                 <p>Animation playback</p>
               </div>
-              <Button
-                onClick={() => {
-                  setActiveStep(0);
-                  setShowTutorial(true);
-                }}
-                variant="contained"
-                style={{ backgroundColor: "#404156", color: "#fff" }}
-              >
-                Show tutorial
-              </Button>
             </div>
           </div>
         </Drawer>

@@ -1,7 +1,7 @@
 import DeckGL from "@deck.gl/react";
 import { Map as MapGL } from "react-map-gl";
 import maplibregl from "maplibre-gl";
-import { PolygonLayer, ScatterplotLayer } from "@deck.gl/layers";
+import { PathLayer, PolygonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { FlyToInterpolator } from "deck.gl";
 import { TripsLayer } from "@deck.gl/geo-layers";
 import { createGeoJSONCircle } from "../helpers";
@@ -14,9 +14,14 @@ import {
 } from "../services/MapService";
 import PathfindingState from "../models/PathfindingState";
 import Interface from "./Interface";
-import { INITIAL_COLORS, INITIAL_VIEW_STATE, MAP_STYLE } from "../config";
+import {
+  COMPARISON_COLORS,
+  INITIAL_COLORS,
+  INITIAL_VIEW_STATE,
+  MAP_STYLE,
+} from "../config";
 import useSmoothStateChange from "../hooks/useSmoothStateChange";
-import MetricsOverlay from "./MetricsOverlay";
+import MetricsSidebar from "./MetricsSidebar";
 
 function Map() {
   const [startNode, setStartNode] = useState(null);
@@ -29,17 +34,21 @@ function Map() {
   const [playbackOn, setPlaybackOn] = useState(false);
   const [playbackDirection, setPlaybackDirection] = useState(1);
   const [fadeRadiusReverse, setFadeRadiusReverse] = useState(false);
-  const [cinematic, setCinematic] = useState(false);
   const [placeEnd, setPlaceEnd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState({
     algorithm: "astar",
     radius: 4,
     speed: 5,
+    beamWidth: 5,
   });
   const [colors, setColors] = useState(INITIAL_COLORS);
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
   const [metrics, setMetrics] = useState(null);
+  const [savedComparisons, setSavedComparisons] = useState([]);
+  const [selectedComparisonColor, setSelectedComparisonColor] = useState(
+    COMPARISON_COLORS[0],
+  );
   const ui = useRef();
   const fadeRadius = useRef();
   const requestRef = useRef();
@@ -156,7 +165,9 @@ function Map() {
     setMetrics(null);
     setTimeout(() => {
       clearPath();
-      state.current.start(settings.algorithm);
+      state.current.start(settings.algorithm, {
+        beamWidth: settings.beamWidth,
+      });
       setStarted(true);
     }, 400);
   }
@@ -181,6 +192,7 @@ function Map() {
 
   function clearPath() {
     setStarted(false);
+    setPlaybackOn(false);
     setTripsData([]);
     setTime(0);
     state.current.reset();
@@ -190,6 +202,65 @@ function Map() {
     traceNode.current = null;
     traceNode2.current = null;
     setAnimationEnded(false);
+  }
+
+  function saveComparison() {
+    if (!animationEnded || !metrics) return;
+
+    const routeSegments = waypoints.current
+      .filter((segment) => segment.color === "route")
+      .map((segment) => ({
+        path: segment.path.map(([longitude, latitude]) => [
+          longitude,
+          latitude,
+        ]),
+      }));
+
+    if (routeSegments.length === 0) {
+      ui.current?.showSnack("Finish a route before saving it.", "info");
+      return;
+    }
+
+    const color = selectedComparisonColor;
+    const snapshot = {
+      id: `${Date.now()}-${metrics.algorithmName}`,
+      color,
+      label: metrics.algorithmName,
+      metrics: { ...metrics },
+      segments: routeSegments.map((segment) => ({ ...segment, color })),
+    };
+
+    setSavedComparisons((current) => {
+      const existingIndex = current.findIndex(
+        (item) => item.metrics.algorithmName === metrics.algorithmName,
+      );
+
+      if (existingIndex === -1) {
+        ui.current?.showSnack(
+          `${metrics.algorithmName} route saved for comparison.`,
+          "info",
+        );
+        const next = [...current, snapshot];
+        const nextColor =
+          COMPARISON_COLORS[next.length % COMPARISON_COLORS.length];
+        setSelectedComparisonColor(nextColor);
+        return next;
+      }
+
+      const next = [...current];
+      next[existingIndex] = {
+        ...snapshot,
+      };
+      ui.current?.showSnack(
+        `${metrics.algorithmName} comparison was updated.`,
+        "info",
+      );
+      return next;
+    });
+  }
+
+  function clearSavedComparisons() {
+    setSavedComparisons([]);
   }
 
   // Progress animation by one step
@@ -345,6 +416,14 @@ function Map() {
   }, [started, time, animationEnded, playbackOn]);
 
   useEffect(() => {
+    // Stop the RAF loop once the route and playback are done.
+    if (animationEnded && !playbackOn && started) {
+      setStarted(false);
+      previousTimeRef.current = null;
+    }
+  }, [animationEnded, playbackOn, started]);
+
+  useEffect(() => {
     navigator.geolocation.getCurrentPosition((res) => {
       changeLocation(res.coords);
     });
@@ -353,7 +432,7 @@ function Map() {
     if (!settings) return;
     const items = JSON.parse(settings);
 
-    setSettings(items.settings);
+    setSettings((current) => ({ ...current, ...items.settings }));
     setColors(items.colors);
   }, []);
 
@@ -408,6 +487,17 @@ function Map() {
             updateTriggers={{
               getColor: [colors.path, colors.route],
             }}
+          />
+          <PathLayer
+            id="saved-comparison-routes"
+            data={savedComparisons.flatMap((comparison) => comparison.segments)}
+            getPath={(d) => d.path}
+            getColor={(d) => d.color}
+            widthMinPixels={4}
+            rounded={true}
+            billboard={false}
+            opacity={0.9}
+            updateTriggers={{ getColor: [savedComparisons.length] }}
           />
           <ScatterplotLayer
             id="start-end-points"
@@ -471,35 +561,19 @@ function Map() {
         colors={colors}
         setColors={changeColors}
         loading={loading}
-        cinematic={cinematic}
-        setCinematic={setCinematic}
         placeEnd={placeEnd}
         setPlaceEnd={setPlaceEnd}
         changeRadius={changeRadius}
       />
-      <MetricsOverlay metrics={metrics} visible={animationEnded} />
-      <div className="attrib-container">
-        <summary
-          className="maplibregl-ctrl-attrib-button"
-          title="Toggle attribution"
-          aria-label="Toggle attribution"
-        ></summary>
-        <div className="maplibregl-ctrl-attrib-inner">
-          ©{" "}
-          <a
-            href="https://carto.com/about-carto/"
-            target="_blank"
-            rel="noopener"
-          >
-            CARTO
-          </a>
-          , ©{" "}
-          <a href="http://www.openstreetmap.org/about/" target="_blank">
-            OpenStreetMap
-          </a>{" "}
-          contributors
-        </div>
-      </div>
+      <MetricsSidebar
+        metrics={metrics}
+        visible={animationEnded || savedComparisons.length > 0}
+        savedComparisons={savedComparisons}
+        onSaveComparison={saveComparison}
+        onClearComparisons={clearSavedComparisons}
+        selectedColor={selectedComparisonColor}
+        onSelectedColorChange={setSelectedComparisonColor}
+      />
     </>
   );
 }
