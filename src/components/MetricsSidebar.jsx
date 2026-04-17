@@ -43,6 +43,20 @@ function formatMetric(value, suffix = "") {
   return `${value}${suffix}`;
 }
 
+function getNodesPerSecond(metrics) {
+  if (metrics?.nodesPerSecond != null && metrics.nodesPerSecond !== "") {
+    return metrics.nodesPerSecond;
+  }
+
+  const execMs = Number.parseFloat(metrics?.execTime ?? 0);
+  const explored = Number.parseFloat(metrics?.nodesExplored ?? 0);
+  if (!Number.isFinite(execMs) || execMs <= 0 || !Number.isFinite(explored)) {
+    return 0;
+  }
+
+  return (explored / (execMs / 1000)).toFixed(1);
+}
+
 function sortComparisons(savedComparisons) {
   return [...savedComparisons].sort((a, b) => {
     const aName = a?.metrics?.algorithmName ?? a?.label ?? "";
@@ -170,6 +184,7 @@ const MetricsSidebar = ({
                   Time: {formatMetric(metrics.execTime, " ms")}
                   {" • "}Nodes: {formatMetric(metrics.nodesExplored)}
                   {" • "}Path: {formatMetric(metrics.pathLength, " km")}
+                  {" • "}Nodes/sec: {formatMetric(getNodesPerSecond(metrics))}
                 </Typography>
                 <Stack spacing={0.8}>
                   <Typography sx={{ fontSize: 12, color: "#b8c2d3" }}>
@@ -307,7 +322,7 @@ const MetricsSidebar = ({
                     <TableCell align="right">Time</TableCell>
                     <TableCell align="right">Nodes</TableCell>
                     <TableCell align="right">Path</TableCell>
-                    <TableCell align="right">Memory</TableCell>
+                    <TableCell align="right">Nodes/sec</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -337,7 +352,7 @@ const MetricsSidebar = ({
                         {formatMetric(comparison.metrics.pathLength, " km")}
                       </TableCell>
                       <TableCell align="right">
-                        {formatMetric(comparison.metrics.memoryUsage)}
+                        {formatMetric(getNodesPerSecond(comparison.metrics))}
                       </TableCell>
                     </TableRow>
                   ))}

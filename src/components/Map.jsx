@@ -34,13 +34,13 @@ function Map() {
   const [playbackOn, setPlaybackOn] = useState(false);
   const [playbackDirection, setPlaybackDirection] = useState(1);
   const [fadeRadiusReverse, setFadeRadiusReverse] = useState(false);
-  const [cinematic, setCinematic] = useState(false);
   const [placeEnd, setPlaceEnd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState({
     algorithm: "astar",
     radius: 4,
     speed: 5,
+    beamWidth: 5,
   });
   const [colors, setColors] = useState(INITIAL_COLORS);
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
@@ -165,7 +165,9 @@ function Map() {
     setMetrics(null);
     setTimeout(() => {
       clearPath();
-      state.current.start(settings.algorithm);
+      state.current.start(settings.algorithm, {
+        beamWidth: settings.beamWidth,
+      });
       setStarted(true);
     }, 400);
   }
@@ -430,7 +432,7 @@ function Map() {
     if (!settings) return;
     const items = JSON.parse(settings);
 
-    setSettings(items.settings);
+    setSettings((current) => ({ ...current, ...items.settings }));
     setColors(items.colors);
   }, []);
 
@@ -559,8 +561,6 @@ function Map() {
         colors={colors}
         setColors={changeColors}
         loading={loading}
-        cinematic={cinematic}
-        setCinematic={setCinematic}
         placeEnd={placeEnd}
         setPlaceEnd={setPlaceEnd}
         changeRadius={changeRadius}
@@ -574,28 +574,6 @@ function Map() {
         selectedColor={selectedComparisonColor}
         onSelectedColorChange={setSelectedComparisonColor}
       />
-      <div className="attrib-container">
-        <summary
-          className="maplibregl-ctrl-attrib-button"
-          title="Toggle attribution"
-          aria-label="Toggle attribution"
-        ></summary>
-        <div className="maplibregl-ctrl-attrib-inner">
-          ©{" "}
-          <a
-            href="https://carto.com/about-carto/"
-            target="_blank"
-            rel="noopener"
-          >
-            CARTO
-          </a>
-          , ©{" "}
-          <a href="http://www.openstreetmap.org/about/" target="_blank">
-            OpenStreetMap
-          </a>{" "}
-          contributors
-        </div>
-      </div>
     </>
   );
 }

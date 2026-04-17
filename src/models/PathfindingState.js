@@ -1,5 +1,7 @@
 import AStar from "./algorithms/AStar";
+import BeamSearch from "./algorithms/BeamSearch";
 import BidirectionalSearch from "./algorithms/BidirectionalSearch";
+import BranchAndBound from "./algorithms/BranchAndBound";
 import Dijkstra from "./algorithms/Dijkstra";
 import Greedy from "./algorithms/Greedy";
 import PathfindingAlgorithm from "./algorithms/PathfindingAlgorithm";
@@ -20,7 +22,7 @@ export default class PathfindingState {
         execTime: 0,
         nodesExplored: 0,
         pathLength: 0,
-        memoryUsage: 0,
+        nodesPerSecond: 0,
       };
       PathfindingState._instance = this;
     }
@@ -44,7 +46,7 @@ export default class PathfindingState {
     }
   }
 
-  start(algorithm) {
+  start(algorithm, options = {}) {
     this.reset();
     this._nodesExplored = 0;
 
@@ -53,10 +55,13 @@ export default class PathfindingState {
       greedy: "Greedy",
       dijkstra: "Dijkstra",
       bidirectional: "Bidirectional",
+      branchbound: "Branch and Bound",
+      beamsearch: "Beam Search",
     };
     this.metrics = {
       ...this.metrics,
       algorithmName: algoNames[algorithm] ?? "A*",
+      nodesPerSecond: 0,
     };
 
     switch (algorithm) {
@@ -71,6 +76,12 @@ export default class PathfindingState {
         break;
       case "bidirectional":
         this.algorithm = new BidirectionalSearch();
+        break;
+      case "branchbound":
+        this.algorithm = new BranchAndBound();
+        break;
+      case "beamsearch":
+        this.algorithm = new BeamSearch(options.beamWidth ?? 5);
         break;
       default:
         this.algorithm = new AStar();
@@ -88,6 +99,8 @@ export default class PathfindingState {
     if (this.algorithm.finished || updatedNodes.length === 0) {
       this.finished = true;
       const execTime = performance.now() - this._startTime;
+      const nodesPerSecond =
+        execTime > 0 ? (this._nodesExplored / (execTime / 1000)).toFixed(1) : 0;
 
       let pathLength = 0;
 
@@ -135,7 +148,7 @@ export default class PathfindingState {
         execTime: execTime.toFixed(1),
         nodesExplored: this._nodesExplored,
         pathLength: pathLength.toFixed(2),
-        memoryUsage: this.algorithm.openList?.length ?? 0,
+        nodesPerSecond,
       };
     }
 

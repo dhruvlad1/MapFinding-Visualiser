@@ -22,7 +22,7 @@ import {
   Menu,
 } from "@mui/material";
 import { MuiColorInput } from "mui-color-input";
-import { PlayArrow, Settings, Movie, Pause, Replay } from "@mui/icons-material";
+import { PlayArrow, Settings, Pause, Replay } from "@mui/icons-material";
 import Slider from "./Slider";
 import { INITIAL_COLORS, LOCATIONS } from "../config";
 import { arrayToRgb, rgbToArray } from "../helpers";
@@ -40,12 +40,10 @@ const Interface = forwardRef(
       colors,
       loading,
       timeChanged,
-      cinematic,
       placeEnd,
       changeRadius,
       changeAlgorithm,
       setPlaceEnd,
-      setCinematic,
       setSettings,
       setColors,
       startPathfinding,
@@ -61,10 +59,8 @@ const Interface = forwardRef(
       message: "",
       type: "error",
     });
-    const [helper, setHelper] = useState(false);
     const [menuAnchor, setMenuAnchor] = useState(null);
     const menuOpen = Boolean(menuAnchor);
-    const helperTime = useRef(4800);
     const rightDown = useRef(false);
     const leftDown = useRef(false);
 
@@ -77,10 +73,6 @@ const Interface = forwardRef(
 
     function closeSnack() {
       setSnack({ ...snack, open: false });
-    }
-
-    function closeHelper() {
-      setHelper(false);
     }
 
     // Start pathfinding or toggle playback
@@ -118,8 +110,7 @@ const Interface = forwardRef(
     };
 
     window.onkeyup = (e) => {
-      if (e.code === "Escape") setCinematic(false);
-      else if (e.code === "Space") {
+      if (e.code === "Space") {
         e.preventDefault();
         handlePlay();
       } else if (e.code === "ArrowRight" && rightDown.current) {
@@ -131,18 +122,9 @@ const Interface = forwardRef(
       } else if (e.code === "KeyR" && (animationEnded || !started)) clearPath();
     };
 
-    // Show cinematic mode helper
-    useEffect(() => {
-      if (!cinematic) return;
-      setHelper(true);
-      setTimeout(() => {
-        helperTime.current = 2500;
-      }, 200);
-    }, [cinematic]);
-
     return (
       <>
-        <div className={`nav-top ${cinematic ? "cinematic" : ""}`}>
+        <div className="nav-top">
           <div className="side slider-container">
             <Typography id="playback-slider" gutterBottom>
               Animation playback
@@ -194,7 +176,7 @@ const Interface = forwardRef(
           </div>
         </div>
 
-        <div className={`point-controls ${cinematic ? "cinematic" : ""}`}>
+        <div className="point-controls">
           <Button
             onClick={() => {
               setPlaceEnd(false);
@@ -229,7 +211,7 @@ const Interface = forwardRef(
           </Button>
         </div>
 
-        <div className={`nav-right ${cinematic ? "cinematic" : ""}`}>
+        <div className="nav-right">
           <Tooltip title="Open settings">
             <IconButton
               onClick={() => {
@@ -239,21 +221,6 @@ const Interface = forwardRef(
               size="large"
             >
               <Settings
-                style={{ color: "#fff", width: 24, height: 24 }}
-                fontSize="inherit"
-              />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Cinematic mode">
-            <IconButton
-              className="btn-cinematic"
-              onClick={() => {
-                setCinematic(!cinematic);
-              }}
-              style={{ backgroundColor: "#2A2B37", width: 36, height: 36 }}
-              size="large"
-            >
-              <Movie
                 style={{ color: "#fff", width: 24, height: 24 }}
                 fontSize="inherit"
               />
@@ -288,23 +255,6 @@ const Interface = forwardRef(
           </Alert>
         </Snackbar>
 
-        <Snackbar
-          anchorOrigin={{ vertical: "top", horizontal: "center" }}
-          open={helper}
-          autoHideDuration={helperTime.current}
-          onClose={closeHelper}
-        >
-          <div className="cinematic-alert">
-            <Typography fontSize="18px">
-              <b>Cinematic mode</b>
-            </Typography>
-            <Typography>Use keyboard shortcuts to control animation</Typography>
-            <Typography>
-              Press <b>Escape</b> to exit
-            </Typography>
-          </div>
-        </Snackbar>
-
         <div className="mobile-controls">
           <Button
             onClick={() => {
@@ -337,7 +287,7 @@ const Interface = forwardRef(
         </div>
 
         <Drawer
-          className={`side-drawer ${cinematic ? "cinematic" : ""}`}
+          className="side-drawer"
           anchor="left"
           open={sidebar}
           onClose={() => {
@@ -378,6 +328,10 @@ const Interface = forwardRef(
                 <MenuItem value={"bidirectional"}>
                   Bidirectional Search algorithm
                 </MenuItem>
+                <MenuItem value={"branchbound"}>
+                  Branch and Bound algorithm
+                </MenuItem>
+                <MenuItem value={"beamsearch"}>Beam Search algorithm</MenuItem>
               </Select>
             </FormControl>
 
@@ -482,6 +436,40 @@ const Interface = forwardRef(
                 style={{ marginBottom: 1 }}
               />
             </div>
+
+            {settings.algorithm === "beamsearch" && (
+              <div className="side slider-container">
+                <Typography id="beam-width-slider">
+                  Beam width: {settings.beamWidth}
+                </Typography>
+                <Slider
+                  disabled={started && !animationEnded}
+                  min={2}
+                  max={25}
+                  step={1}
+                  value={settings.beamWidth}
+                  onChange={(e) => {
+                    setSettings({
+                      ...settings,
+                      beamWidth: Number(e.target.value),
+                    });
+                  }}
+                  className="slider"
+                  aria-labelledby="beam-width-slider"
+                  style={{ marginBottom: 1 }}
+                  marks={[
+                    {
+                      value: 2,
+                      label: "2",
+                    },
+                    {
+                      value: 25,
+                      label: "25",
+                    },
+                  ]}
+                />
+              </div>
+            )}
 
             <div className="styles-container">
               <Typography
