@@ -5,7 +5,7 @@ import { PathLayer, PolygonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { FlyToInterpolator } from "deck.gl";
 import { TripsLayer } from "@deck.gl/geo-layers";
 import { createGeoJSONCircle } from "../helpers";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getBoundingBoxFromPolygon,
   getMapGraph,
@@ -22,6 +22,47 @@ import {
 } from "../config";
 import useSmoothStateChange from "../hooks/useSmoothStateChange";
 import MetricsSidebar from "./MetricsSidebar";
+
+const METERS_PER_DEGREE_LAT = 111320;
+const COMPARISON_PATH_LANE_OFFSET_METERS = 5;
+
+function getAlternatingLaneOffset(index) {
+  if (index === 0) return 0;
+  const laneNumber = Math.ceil(index / 2);
+  return index % 2 === 1 ? -laneNumber : laneNumber;
+}
+
+function offsetSegmentPath(path, offsetMeters) {
+  if (!Array.isArray(path) || path.length < 2 || offsetMeters === 0)
+    return path;
+
+  const [start, end] = path;
+  if (!start || !end) return path;
+
+  const avgLatRadians = ((start[1] + end[1]) / 2) * (Math.PI / 180);
+  const metersPerDegreeLon = Math.max(
+    100,
+    METERS_PER_DEGREE_LAT * Math.cos(avgLatRadians),
+  );
+
+  const dxMeters = (end[0] - start[0]) * metersPerDegreeLon;
+  const dyMeters = (end[1] - start[1]) * METERS_PER_DEGREE_LAT;
+  const segmentLength = Math.hypot(dxMeters, dyMeters);
+
+  if (segmentLength === 0) return path;
+
+  // Shift each segment along its perpendicular vector to create side-by-side lanes.
+  const normalX = -dyMeters / segmentLength;
+  const normalY = dxMeters / segmentLength;
+
+  const deltaLon = (normalX * offsetMeters) / metersPerDegreeLon;
+  const deltaLat = (normalY * offsetMeters) / METERS_PER_DEGREE_LAT;
+
+  return [
+    [start[0] + deltaLon, start[1] + deltaLat],
+    [end[0] + deltaLon, end[1] + deltaLat],
+  ];
+}
 
 function Map() {
   const [startNode, setStartNode] = useState(null);
@@ -65,6 +106,22 @@ function Map() {
     400,
     fadeRadius.current,
     fadeRadiusReverse,
+  );
+
+  const savedComparisonSegments = useMemo(
+    () =>
+      savedComparisons.flatMap((comparison, index) => {
+        const laneBaseIndex = comparison.laneIndex ?? index;
+        const laneOffset =
+          getAlternatingLaneOffset(laneBaseIndex) *
+          COMPARISON_PATH_LANE_OFFSET_METERS;
+
+        return comparison.segments.map((segment) => ({
+          ...segment,
+          path: offsetSegmentPath(segment.path, laneOffset),
+        }));
+      }),
+    [savedComparisons],
   );
 
   async function mapClick(e, _info, radius = null) {
@@ -221,19 +278,24 @@ function Map() {
       return;
     }
 
-    const color = selectedComparisonColor;
-    const snapshot = {
-      id: `${Date.now()}-${metrics.algorithmName}`,
-      color,
-      label: metrics.algorithmName,
-      metrics: { ...metrics },
-      segments: routeSegments.map((segment) => ({ ...segment, color })),
-    };
-
     setSavedComparisons((current) => {
       const existingIndex = current.findIndex(
         (item) => item.metrics.algorithmName === metrics.algorithmName,
       );
+
+      const color = selectedComparisonColor;
+      const laneIndex =
+        existingIndex === -1
+          ? current.length
+          : (current[existingIndex].laneIndex ?? existingIndex);
+      const snapshot = {
+        id: `${Date.now()}-${metrics.algorithmName}`,
+        color,
+        label: metrics.algorithmName,
+        laneIndex,
+        metrics: { ...metrics },
+        segments: routeSegments.map((segment) => ({ ...segment, color })),
+      };
 
       if (existingIndex === -1) {
         ui.current?.showSnack(
@@ -490,7 +552,7 @@ function Map() {
           />
           <PathLayer
             id="saved-comparison-routes"
-            data={savedComparisons.flatMap((comparison) => comparison.segments)}
+            data={savedComparisonSegments}
             getPath={(d) => d.path}
             getColor={(d) => d.color}
             widthMinPixels={4}

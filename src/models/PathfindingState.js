@@ -99,8 +99,11 @@ export default class PathfindingState {
     if (this.algorithm.finished || updatedNodes.length === 0) {
       this.finished = true;
       const execTime = performance.now() - this._startTime;
+      const execTimeRounded = Number(execTime.toFixed(1));
       const nodesPerSecond =
-        execTime > 0 ? (this._nodesExplored / (execTime / 1000)).toFixed(1) : 0;
+        execTimeRounded > 0
+          ? (this._nodesExplored / (execTimeRounded / 1000)).toFixed(1)
+          : 0;
 
       let pathLength = 0;
 
@@ -145,7 +148,7 @@ export default class PathfindingState {
 
       this.metrics = {
         ...this.metrics,
-        execTime: execTime.toFixed(1),
+        execTime: execTimeRounded.toFixed(1),
         nodesExplored: this._nodesExplored,
         pathLength: pathLength.toFixed(2),
         nodesPerSecond,
