@@ -11,6 +11,7 @@ import PathfindingState from "../models/PathfindingState";
 import Interface from "./Interface";
 import { INITIAL_COLORS, INITIAL_VIEW_STATE, MAP_STYLE } from "../config";
 import useSmoothStateChange from "../hooks/useSmoothStateChange";
+import MetricsOverlay from "./MetricsOverlay";
 
 function Map() {
     const [startNode, setStartNode] = useState(null);
@@ -29,6 +30,7 @@ function Map() {
     const [settings, setSettings] = useState({ algorithm: "astar", radius: 4, speed: 5 });
     const [colors, setColors] = useState(INITIAL_COLORS);
     const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
+    const [metrics, setMetrics] = useState(null);
     const ui = useRef();
     const fadeRadius = useRef();
     const requestRef = useRef();
@@ -116,6 +118,7 @@ function Map() {
     // Start new pathfinding animation
     function startPathfinding() {
         setFadeRadiusReverse(true);
+        setMetrics(null);
         setTimeout(() => {
             clearPath();
             state.current.start(settings.algorithm);
@@ -279,6 +282,12 @@ function Map() {
         setColors(items.colors);
     }, []);
 
+    useEffect(() => {
+        if (animationEnded) {
+            setMetrics({ ...state.current.metrics });
+        }
+    }, [animationEnded]);
+
     return (
         <>
             <div onContextMenu={(e) => { e.preventDefault(); }}>
@@ -372,6 +381,7 @@ function Map() {
                 setPlaceEnd={setPlaceEnd}
                 changeRadius={changeRadius}
             />
+            <MetricsOverlay metrics={metrics} visible={animationEnded} />
             <div className="attrib-container"><summary className="maplibregl-ctrl-attrib-button" title="Toggle attribution" aria-label="Toggle attribution"></summary><div className="maplibregl-ctrl-attrib-inner">© <a href="https://carto.com/about-carto/" target="_blank" rel="noopener">CARTO</a>, © <a href="http://www.openstreetmap.org/about/" target="_blank">OpenStreetMap</a> contributors</div></div>
         </>
     );
