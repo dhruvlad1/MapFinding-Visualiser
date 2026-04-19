@@ -332,6 +332,9 @@ const Interface = forwardRef(
                   Branch and Bound algorithm
                 </MenuItem>
                 <MenuItem value={"beamsearch"}>Beam Search algorithm</MenuItem>
+                <MenuItem value={"hillclimbing"}>
+                  Hill Climbing algorithm
+                </MenuItem>
               </Select>
             </FormControl>
 

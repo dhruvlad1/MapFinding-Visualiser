@@ -4,6 +4,7 @@ import BidirectionalSearch from "./algorithms/BidirectionalSearch";
 import BranchAndBound from "./algorithms/BranchAndBound";
 import Dijkstra from "./algorithms/Dijkstra";
 import Greedy from "./algorithms/Greedy";
+import HillClimbing from "./algorithms/HillClimbing";
 import PathfindingAlgorithm from "./algorithms/PathfindingAlgorithm";
 
 export default class PathfindingState {
@@ -57,6 +58,7 @@ export default class PathfindingState {
       bidirectional: "Bidirectional",
       branchbound: "Branch and Bound",
       beamsearch: "Beam Search",
+      hillclimbing: "Hill Climbing",
     };
     this.metrics = {
       ...this.metrics,
@@ -82,6 +84,9 @@ export default class PathfindingState {
         break;
       case "beamsearch":
         this.algorithm = new BeamSearch(options.beamWidth ?? 5);
+        break;
+      case "hillclimbing":
+        this.algorithm = new HillClimbing();
         break;
       default:
         this.algorithm = new AStar();
