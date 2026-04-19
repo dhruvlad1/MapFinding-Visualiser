@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -6,40 +6,15 @@ import {
   Drawer,
   IconButton,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Tooltip,
   Typography,
 } from "@mui/material";
-import { Assessment, ChevronRight, Close } from "@mui/icons-material";
-import { COMPARISON_COLORS } from "../config";
+import { Assessment, ChevronRight, Close, DeleteSweep } from "@mui/icons-material";
 
-const SIDEBAR_WIDTH = 390;
-
-function toHex(value) {
-  return value.toString(16).padStart(2, "0");
-}
-
-function rgbArrayToHex(color) {
-  if (!Array.isArray(color) || color.length < 3) return "#46b780";
-  return `#${toHex(color[0])}${toHex(color[1])}${toHex(color[2])}`;
-}
-
-function hexToRgbArray(hex) {
-  const normalized = hex.replace("#", "");
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return [70, 183, 128];
-  return [
-    parseInt(normalized.slice(0, 2), 16),
-    parseInt(normalized.slice(2, 4), 16),
-    parseInt(normalized.slice(4, 6), 16),
-  ];
-}
+const SIDEBAR_WIDTH = 370;
 
 function formatMetric(value, suffix = "") {
-  if (value == null || value === "") return "-";
+  if (value == null || value === "") return "—";
   return `${value}${suffix}`;
 }
 
@@ -47,51 +22,123 @@ function getNodesPerSecond(metrics) {
   if (metrics?.nodesPerSecond != null && metrics.nodesPerSecond !== "") {
     return metrics.nodesPerSecond;
   }
-
   const execMs = Number.parseFloat(metrics?.execTime ?? 0);
   const explored = Number.parseFloat(metrics?.nodesExplored ?? 0);
   if (!Number.isFinite(execMs) || execMs <= 0 || !Number.isFinite(explored)) {
-    return 0;
+    return "—";
   }
-
   return (explored / (execMs / 1000)).toFixed(1);
 }
 
-function sortComparisons(savedComparisons) {
-  return [...savedComparisons].sort((a, b) => {
-    const aName = a?.metrics?.algorithmName ?? a?.label ?? "";
-    const bName = b?.metrics?.algorithmName ?? b?.label ?? "";
-    return aName.localeCompare(bName);
-  });
+// A single metric row inside a card
+function MetricRow({ label, value }) {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "baseline",
+        py: 0.35,
+      }}
+    >
+      <Typography sx={{ fontSize: 11, color: "#8a9bb5" }}>{label}</Typography>
+      <Typography sx={{ fontSize: 12, color: "#e8f0fa", fontWeight: 600, fontFamily: "monospace" }}>
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
+// Color pill + algo name badge
+function AlgoBadge({ color, label }) {
+  return (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <Box
+        sx={{
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          backgroundColor: `rgb(${color.join(",")})`,
+          boxShadow: `0 0 6px 1px rgba(${color.join(",")},0.55)`,
+          flexShrink: 0,
+        }}
+      />
+      <Typography
+        sx={{
+          fontSize: 13,
+          fontWeight: 700,
+          color: `rgb(${color.join(",")})`,
+          letterSpacing: 0.2,
+        }}
+      >
+        {label}
+      </Typography>
+    </Stack>
+  );
+}
+
+// A card for one saved algorithm run
+function ComparisonCard({ comparison, isLatest }) {
+  const { color, label, metrics } = comparison;
+  return (
+    <Box
+      sx={{
+        borderRadius: 2,
+        border: `1px solid rgba(${color.join(",")},${isLatest ? "0.45" : "0.2"})`,
+        backgroundColor: `rgba(${color.join(",")},0.06)`,
+        p: 1.5,
+        position: "relative",
+        transition: "border-color 0.2s",
+      }}
+    >
+      {isLatest && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: 8,
+            right: 10,
+            fontSize: 9,
+            fontWeight: 700,
+            color: `rgb(${color.join(",")})`,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            opacity: 0.8,
+          }}
+        >
+          latest
+        </Box>
+      )}
+      <AlgoBadge color={color} label={label} />
+      <Divider sx={{ borderColor: `rgba(${color.join(",")},0.15)`, my: 0.9 }} />
+      <MetricRow label="Exec. time" value={formatMetric(metrics.execTime, " ms")} />
+      <MetricRow label="Nodes explored" value={formatMetric(metrics.nodesExplored)} />
+      <MetricRow label="Path length" value={formatMetric(metrics.pathLength, " km")} />
+      <MetricRow label="Memory (nodes)" value={formatMetric(metrics.memoryUsage)} />
+      <MetricRow label="Nodes / sec" value={formatMetric(getNodesPerSecond(metrics))} />
+    </Box>
+  );
 }
 
 const MetricsSidebar = ({
-  metrics,
   visible,
   savedComparisons = [],
-  onSaveComparison,
   onClearComparisons,
-  selectedColor = [70, 183, 128],
-  onSelectedColorChange,
 }) => {
   const [open, setOpen] = useState(false);
   const hasSaved = savedComparisons.length > 0;
 
+  // Auto-open the sidebar when the first result arrives
   useEffect(() => {
-    if (visible) setOpen(true);
-  }, [visible]);
-
-  const rows = useMemo(
-    () => sortComparisons(savedComparisons),
-    [savedComparisons],
-  );
+    if (hasSaved) setOpen(true);
+  }, [hasSaved]);
 
   if (!visible) return null;
 
   return (
     <>
-      {!open ? (
-        <Tooltip title="Open comparison sidebar" placement="left">
+      {/* Collapsed tab to re-open */}
+      {!open && (
+        <Tooltip title="Open results panel" placement="left">
           <IconButton
             onClick={() => setOpen(true)}
             size="large"
@@ -106,15 +153,13 @@ const MetricsSidebar = ({
               color: "#ffffff",
               backgroundColor: "#1f2230",
               border: "1px solid rgba(255,255,255,0.18)",
-              "&:hover": {
-                backgroundColor: "#2a2e41",
-              },
+              "&:hover": { backgroundColor: "#2a2e41" },
             }}
           >
             <ChevronRight />
           </IconButton>
         </Tooltip>
-      ) : null}
+      )}
 
       <Drawer
         anchor="right"
@@ -126,241 +171,110 @@ const MetricsSidebar = ({
             width: SIDEBAR_WIDTH,
             maxWidth: "92vw",
             background:
-              "linear-gradient(180deg, rgba(20,25,40,0.97) 0%, rgba(14,16,24,0.97) 100%)",
+              "linear-gradient(180deg, rgba(18,22,38,0.98) 0%, rgba(11,13,22,0.98) 100%)",
             color: "#f4f7fb",
-            borderLeft: "1px solid rgba(255,255,255,0.08)",
-            backdropFilter: "blur(6px)",
+            borderLeft: "1px solid rgba(255,255,255,0.07)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            flexDirection: "column",
           },
         }}
       >
-        <Stack sx={{ height: "100%" }}>
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              px: 2,
-              py: 1.5,
-            }}
-          >
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Assessment sx={{ color: "#46B780", fontSize: 20 }} />
-              <Typography
-                sx={{ fontWeight: 700, fontSize: 14, letterSpacing: 0.5 }}
+        {/* Header */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            px: 2,
+            py: 1.5,
+            flexShrink: 0,
+          }}
+        >
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Assessment sx={{ color: "#46B780", fontSize: 20 }} />
+            <Typography sx={{ fontWeight: 700, fontSize: 14, letterSpacing: 0.5 }}>
+              Algorithm Results
+            </Typography>
+            {hasSaved && (
+              <Box
+                sx={{
+                  backgroundColor: "#46B780",
+                  color: "#0a0e18",
+                  borderRadius: 999,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  px: 0.9,
+                  py: 0.1,
+                  lineHeight: "16px",
+                }}
               >
-                Algorithm Comparison
-              </Typography>
-            </Stack>
+                {savedComparisons.length}
+              </Box>
+            )}
+          </Stack>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            {hasSaved && (
+              <Tooltip title="Clear all results">
+                <IconButton
+                  onClick={onClearComparisons}
+                  size="small"
+                  sx={{ color: "#8a9bb5", "&:hover": { color: "#f87171" } }}
+                  aria-label="Clear all algorithm results"
+                >
+                  <DeleteSweep fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
             <IconButton
               onClick={() => setOpen(false)}
               size="small"
-              sx={{ color: "#c9d4e3" }}
-              aria-label="Close comparison sidebar"
+              sx={{ color: "#8a9bb5" }}
+              aria-label="Close results sidebar"
             >
               <Close fontSize="small" />
             </IconButton>
-          </Box>
+          </Stack>
+        </Box>
 
-          <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
+        <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
 
-          <Box sx={{ p: 2, pt: 1.5 }}>
-            {metrics ? (
-              <Stack spacing={1.1} sx={{ mb: 1.5 }}>
-                <Typography
-                  sx={{
-                    fontSize: 12,
-                    color: "#a5bbcc",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Current run
-                </Typography>
-                <Typography
-                  sx={{ fontSize: 15, fontWeight: 700, color: "#ffffff" }}
-                >
-                  {metrics.algorithmName}
-                </Typography>
-                <Typography sx={{ fontSize: 12, color: "#b8c2d3" }}>
-                  Time: {formatMetric(metrics.execTime, " ms")}
-                  {" • "}Nodes: {formatMetric(metrics.nodesExplored)}
-                  {" • "}Path: {formatMetric(metrics.pathLength, " km")}
-                  {" • "}Nodes/sec: {formatMetric(getNodesPerSecond(metrics))}
-                </Typography>
-                <Stack spacing={0.8}>
-                  <Typography sx={{ fontSize: 12, color: "#b8c2d3" }}>
-                    Saved path color
-                  </Typography>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    {COMPARISON_COLORS.map((color) => {
-                      const isActive =
-                        selectedColor[0] === color[0] &&
-                        selectedColor[1] === color[1] &&
-                        selectedColor[2] === color[2];
-
-                      return (
-                        <IconButton
-                          key={`swatch-${color.join("-")}`}
-                          onClick={() => onSelectedColorChange?.(color)}
-                          size="small"
-                          sx={{
-                            width: 22,
-                            height: 22,
-                            border: isActive
-                              ? "2px solid #ffffff"
-                              : "1px solid rgba(255,255,255,0.35)",
-                            backgroundColor: `rgb(${color.join(",")})`,
-                            "&:hover": {
-                              backgroundColor: `rgb(${color.join(",")})`,
-                            },
-                          }}
-                        />
-                      );
-                    })}
-                    <Box
-                      component="input"
-                      type="color"
-                      aria-label="Select comparison path color"
-                      value={rgbArrayToHex(selectedColor)}
-                      onChange={(e) =>
-                        onSelectedColorChange?.(hexToRgbArray(e.target.value))
-                      }
-                      sx={{
-                        width: 28,
-                        height: 28,
-                        p: 0,
-                        border: "1px solid rgba(255,255,255,0.35)",
-                        borderRadius: 1,
-                        backgroundColor: "transparent",
-                        cursor: "pointer",
-                      }}
-                    />
-                  </Stack>
-                </Stack>
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={onSaveComparison}
-                    disabled={!metrics}
-                    sx={{
-                      textTransform: "none",
-                      backgroundColor: "#46B780",
-                      "&:hover": { backgroundColor: "#39a16e" },
-                    }}
-                  >
-                    Save current algorithm
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={onClearComparisons}
-                    disabled={!hasSaved}
-                    sx={{
-                      textTransform: "none",
-                      borderColor: "rgba(255,255,255,0.2)",
-                      color: "#f4f7fb",
-                    }}
-                  >
-                    Clear saved
-                  </Button>
-                </Stack>
-              </Stack>
-            ) : (
-              <Stack spacing={1} sx={{ mb: 1.5 }}>
-                <Typography
-                  sx={{
-                    fontSize: 12,
-                    color: "#a5bbcc",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Current run
-                </Typography>
-                <Typography sx={{ fontSize: 12, color: "#b8c2d3" }}>
-                  Run an algorithm, then save it to compare metrics side by
-                  side.
-                </Typography>
-              </Stack>
-            )}
-          </Box>
-
-          <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
-
-          <Box sx={{ p: 2, pt: 1.5, overflowY: "auto" }}>
-            <Typography
-              sx={{
-                fontSize: 12,
-                color: "#a5bbcc",
-                textTransform: "uppercase",
-                mb: 1.2,
-              }}
-            >
-              Saved comparisons
-            </Typography>
-
-            {!hasSaved ? (
-              <Typography sx={{ fontSize: 12, color: "#b8c2d3" }}>
-                No saved algorithm runs yet.
+        {/* Scrollable results area */}
+        <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
+          {!hasSaved ? (
+            <Stack spacing={1} sx={{ mt: 1 }}>
+              <Typography sx={{ fontSize: 12, color: "#a5bbcc" }}>
+                Run an algorithm to see its results here.
               </Typography>
-            ) : (
-              <Table
-                size="small"
-                sx={{
-                  "& .MuiTableCell-root": {
-                    borderColor: "rgba(255,255,255,0.08)",
-                    color: "#ebf0f7",
-                    px: 1,
-                    py: 0.8,
-                    fontSize: 12,
-                    whiteSpace: "nowrap",
-                  },
-                }}
-              >
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Algorithm</TableCell>
-                    <TableCell align="right">Time</TableCell>
-                    <TableCell align="right">Nodes</TableCell>
-                    <TableCell align="right">Path</TableCell>
-                    <TableCell align="right">Nodes/sec</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {rows.map((comparison) => (
-                    <TableRow key={comparison.id}>
-                      <TableCell>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Box
-                            sx={{
-                              width: 9,
-                              height: 9,
-                              borderRadius: "50%",
-                              backgroundColor: `rgb(${comparison.color.join(",")})`,
-                              flexShrink: 0,
-                            }}
-                          />
-                          <span>{comparison.label}</span>
-                        </Stack>
-                      </TableCell>
-                      <TableCell align="right">
-                        {formatMetric(comparison.metrics.execTime, " ms")}
-                      </TableCell>
-                      <TableCell align="right">
-                        {formatMetric(comparison.metrics.nodesExplored)}
-                      </TableCell>
-                      <TableCell align="right">
-                        {formatMetric(comparison.metrics.pathLength, " km")}
-                      </TableCell>
-                      <TableCell align="right">
-                        {formatMetric(getNodesPerSecond(comparison.metrics))}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </Box>
-        </Stack>
+              <Typography sx={{ fontSize: 11, color: "#5a6880" }}>
+                Each run is automatically saved with a unique color. Change your start or end point to reset.
+              </Typography>
+            </Stack>
+          ) : (
+            <Stack spacing={1.5}>
+              {/* Show most-recent first */}
+              {[...savedComparisons].reverse().map((comparison, idx) => (
+                <ComparisonCard
+                  key={comparison.id}
+                  comparison={comparison}
+                  isLatest={idx === 0}
+                />
+              ))}
+            </Stack>
+          )}
+        </Box>
+
+        {/* Legend footer */}
+        {hasSaved && (
+          <>
+            <Divider sx={{ borderColor: "rgba(255,255,255,0.07)" }} />
+            <Box sx={{ px: 2, py: 1.2, flexShrink: 0 }}>
+              <Typography sx={{ fontSize: 10, color: "#5a6880", lineHeight: 1.5 }}>
+                Colors are fixed per algorithm. Select a new start point to clear all results.
+              </Typography>
+            </Box>
+          </>
+        )}
       </Drawer>
     </>
   );

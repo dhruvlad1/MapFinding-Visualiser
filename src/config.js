@@ -36,6 +36,17 @@ export const COMPARISON_COLORS = [
   [193, 124, 255],
 ];
 
+// Fixed color assigned to each algorithm — consistent across all runs.
+export const ALGO_COLORS = {
+  astar:          [64, 170, 255],   // blue
+  greedy:         [255, 138, 61],   // orange
+  dijkstra:       [138, 82, 255],   // purple
+  bidirectional:  [255, 75, 75],    // red-orange
+  branchbound:    [245, 92, 180],   // pink
+  beamsearch:     [248, 210, 73],   // yellow
+  hillclimbing:   [94, 234, 212],   // cyan
+};
+
 export const LOCATIONS = [
   { name: "New York", latitude: 40.712, longitude: -74.006 },
   { name: "Tokyo", latitude: 35.682, longitude: 139.759 },

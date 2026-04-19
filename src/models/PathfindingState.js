@@ -24,6 +24,7 @@ export default class PathfindingState {
         nodesExplored: 0,
         pathLength: 0,
         nodesPerSecond: 0,
+        memoryUsage: 0,
       };
       PathfindingState._instance = this;
     }
@@ -95,11 +96,23 @@ export default class PathfindingState {
 
     this.algorithm.start(this.startNode, this.endNode);
     this._startTime = performance.now();
+    this._peakMemory = 0;
   }
 
   nextStep() {
     const updatedNodes = this.algorithm.nextStep();
     this._nodesExplored += updatedNodes.length;
+
+    // Track peak frontier size as a proxy for memory usage.
+    // Handles both array-based frontiers (openList) and
+    // Set-based frontiers (openSetStart/openSetEnd) used by Bidirectional.
+    const openListSize =
+      (this.algorithm.openList?.length ?? 0) +
+      (this.algorithm.openSetStart?.size ?? 0) +
+      (this.algorithm.openSetEnd?.size ?? 0);
+    if (openListSize > this._peakMemory) {
+      this._peakMemory = openListSize;
+    }
 
     if (this.algorithm.finished || updatedNodes.length === 0) {
       this.finished = true;
@@ -157,6 +170,7 @@ export default class PathfindingState {
         nodesExplored: this._nodesExplored,
         pathLength: pathLength.toFixed(2),
         nodesPerSecond,
+        memoryUsage: this._peakMemory,
       };
     }
 

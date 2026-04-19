@@ -4,11 +4,13 @@ class HillClimbing extends PathfindingAlgorithm {
   constructor() {
     super();
     this.currentNode = null;
+    this.openList = []; // exposed for memory tracking
   }
 
   start(startNode, endNode) {
     super.start(startNode, endNode);
     this.currentNode = this.startNode;
+    this.openList = [this.startNode];
     this.startNode.distanceToEnd = Math.hypot(
       this.startNode.longitude - this.endNode.longitude,
       this.startNode.latitude - this.endNode.latitude,
@@ -24,6 +26,14 @@ class HillClimbing extends PathfindingAlgorithm {
     const updatedNodes = [];
     const node = this.currentNode;
 
+    // Ensure the current node always has its heuristic computed.
+    if (!node.distanceToEnd) {
+      node.distanceToEnd = Math.hypot(
+        node.longitude - this.endNode.longitude,
+        node.latitude - this.endNode.latitude,
+      );
+    }
+
     node.visited = true;
     const refEdge = node.edges.find(
       (e) => e.getOtherNode(node) === node.referer,
@@ -33,6 +43,7 @@ class HillClimbing extends PathfindingAlgorithm {
     // Found end node
     if (node.id === this.endNode.id) {
       this.currentNode = null;
+      this.openList = [];
       this.finished = true;
       return [node];
     }
@@ -67,13 +78,17 @@ class HillClimbing extends PathfindingAlgorithm {
       }
     }
 
-    if (bestNeighbor && bestNeighbor.distanceToEnd < node.distanceToEnd) {
+    // Move to the best neighbour unconditionally.
+    // Hill climbing stops only when truly stuck (no unvisited neighbours).
+    if (bestNeighbor) {
       bestNeighbor.parent = node;
       bestNeighbor.referer = node;
       this.currentNode = bestNeighbor;
+      this.openList = [bestNeighbor]; // one candidate in frontier at all times
     } else {
-      // No improving move means local optimum (or dead end) was reached.
+      // No unvisited neighbours — local optimum or dead end reached.
       this.currentNode = null;
+      this.openList = [];
       this.finished = true;
     }
 

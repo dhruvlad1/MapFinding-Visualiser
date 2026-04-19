@@ -15,6 +15,7 @@ import {
 import PathfindingState from "../models/PathfindingState";
 import Interface from "./Interface";
 import {
+  ALGO_COLORS,
   COMPARISON_COLORS,
   INITIAL_COLORS,
   INITIAL_VIEW_STATE,
@@ -87,9 +88,6 @@ function Map() {
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
   const [metrics, setMetrics] = useState(null);
   const [savedComparisons, setSavedComparisons] = useState([]);
-  const [selectedComparisonColor, setSelectedComparisonColor] = useState(
-    COMPARISON_COLORS[0],
-  );
   const ui = useRef();
   const fadeRadius = useRef();
   const requestRef = useRef();
@@ -180,6 +178,10 @@ function Map() {
         return;
       }
 
+      // New start point selected — clear previous comparison results.
+      setSavedComparisons([]);
+      setMetrics(null);
+
       // Fetch nearest node for start node
       const node = await getNearestNode(e.coordinate[1], e.coordinate[0]);
       if (!node) {
@@ -261,10 +263,10 @@ function Map() {
     setAnimationEnded(false);
   }
 
-  function saveComparison() {
-    if (!animationEnded || !metrics) return;
-
-    const routeSegments = waypoints.current
+  // Auto-save a comparison entry when the animation finishes.
+  // Uses the fixed per-algorithm color from ALGO_COLORS.
+  function saveComparison(completedMetrics, currentWaypoints) {
+    const routeSegments = currentWaypoints
       .filter((segment) => segment.color === "route")
       .map((segment) => ({
         path: segment.path.map(([longitude, latitude]) => [
@@ -273,50 +275,36 @@ function Map() {
         ]),
       }));
 
-    if (routeSegments.length === 0) {
-      ui.current?.showSnack("Finish a route before saving it.", "info");
-      return;
-    }
+    if (routeSegments.length === 0) return;
+
+    const color =
+      ALGO_COLORS[settings.algorithm] ?? COMPARISON_COLORS[0];
 
     setSavedComparisons((current) => {
       const existingIndex = current.findIndex(
-        (item) => item.metrics.algorithmName === metrics.algorithmName,
+        (item) => item.metrics.algorithmName === completedMetrics.algorithmName,
       );
 
-      const color = selectedComparisonColor;
       const laneIndex =
         existingIndex === -1
           ? current.length
           : (current[existingIndex].laneIndex ?? existingIndex);
+
       const snapshot = {
-        id: `${Date.now()}-${metrics.algorithmName}`,
+        id: `${Date.now()}-${completedMetrics.algorithmName}`,
         color,
-        label: metrics.algorithmName,
+        label: completedMetrics.algorithmName,
         laneIndex,
-        metrics: { ...metrics },
+        metrics: { ...completedMetrics },
         segments: routeSegments.map((segment) => ({ ...segment, color })),
       };
 
       if (existingIndex === -1) {
-        ui.current?.showSnack(
-          `${metrics.algorithmName} route saved for comparison.`,
-          "info",
-        );
-        const next = [...current, snapshot];
-        const nextColor =
-          COMPARISON_COLORS[next.length % COMPARISON_COLORS.length];
-        setSelectedComparisonColor(nextColor);
-        return next;
+        return [...current, snapshot];
       }
 
       const next = [...current];
-      next[existingIndex] = {
-        ...snapshot,
-      };
-      ui.current?.showSnack(
-        `${metrics.algorithmName} comparison was updated.`,
-        "info",
-      );
+      next[existingIndex] = snapshot;
       return next;
     });
   }
@@ -500,7 +488,10 @@ function Map() {
 
   useEffect(() => {
     if (animationEnded) {
-      setMetrics({ ...state.current.metrics });
+      const completedMetrics = { ...state.current.metrics };
+      setMetrics(completedMetrics);
+      // Auto-save this run to the comparison sidebar immediately.
+      saveComparison(completedMetrics, waypoints.current);
     }
   }, [animationEnded]);
 
@@ -631,10 +622,7 @@ function Map() {
         metrics={metrics}
         visible={animationEnded || savedComparisons.length > 0}
         savedComparisons={savedComparisons}
-        onSaveComparison={saveComparison}
         onClearComparisons={clearSavedComparisons}
-        selectedColor={selectedComparisonColor}
-        onSelectedColorChange={setSelectedComparisonColor}
       />
     </>
   );
