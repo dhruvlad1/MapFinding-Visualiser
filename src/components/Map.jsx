@@ -23,6 +23,7 @@ import {
 } from "../config";
 import useSmoothStateChange from "../hooks/useSmoothStateChange";
 import MetricsSidebar from "./MetricsSidebar";
+import LiveHUD from "./LiveHUD";
 
 const METERS_PER_DEGREE_LAT = 111320;
 const COMPARISON_PATH_LANE_OFFSET_METERS = 5;
@@ -88,6 +89,10 @@ function Map() {
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
   const [metrics, setMetrics] = useState(null);
   const [savedComparisons, setSavedComparisons] = useState([]);
+  const [isRunningAll, setIsRunningAll] = useState(false);
+  const [runAllIndex, setRunAllIndex] = useState(0);
+  const runAllQueue = useRef([]);
+  const isRunningAllRef = useRef(false);
   const ui = useRef();
   const fadeRadius = useRef();
   const requestRef = useRef();
@@ -452,6 +457,35 @@ function Map() {
     changeSettings({ ...settings, algorithm });
   }
 
+  function setIsRunningAllSync(val) {
+    isRunningAllRef.current = val;
+    setIsRunningAll(val);
+  }
+
+  // All algorithm keys in a fixed order.
+  const ALL_ALGORITHMS = [
+    "astar", "dijkstra", "greedy", "bidirectional",
+    "branchbound", "beamsearch", "hillclimbing",
+  ];
+
+  function startRunAll() {
+    if (!startNode || !endNode) return;
+    // Start fresh — clear all previous comparisons.
+    setSavedComparisons([]);
+    setMetrics(null);
+    const queue = [...ALL_ALGORITHMS];
+    runAllQueue.current = queue.slice(1);   // remaining after the first
+    setRunAllIndex(0);
+    setIsRunningAllSync(true);
+    // Kick off first algorithm
+    changeSettings({ ...settings, algorithm: queue[0] });
+    setTimeout(() => {
+      clearPath();
+      state.current.start(queue[0], { beamWidth: settings.beamWidth });
+      setStarted(true);
+    }, 100);
+  }
+
   function changeRadius(radius) {
     changeSettings({ ...settings, radius });
     if (startNode) {
@@ -487,11 +521,27 @@ function Map() {
   }, []);
 
   useEffect(() => {
-    if (animationEnded) {
-      const completedMetrics = { ...state.current.metrics };
-      setMetrics(completedMetrics);
-      // Auto-save this run to the comparison sidebar immediately.
-      saveComparison(completedMetrics, waypoints.current);
+    if (!animationEnded) return;
+
+    const completedMetrics = { ...state.current.metrics };
+    setMetrics(completedMetrics);
+    saveComparison(completedMetrics, waypoints.current);
+
+    // If we're in "Run All" mode and there are more algorithms, chain the next one.
+    if (isRunningAllRef.current && runAllQueue.current.length > 0) {
+      const nextAlgo = runAllQueue.current.shift();
+      const nextIndex = ALL_ALGORITHMS.indexOf(nextAlgo);
+      setRunAllIndex(nextIndex);
+      changeSettings({ ...settings, algorithm: nextAlgo });
+      setTimeout(() => {
+        clearPath();
+        state.current.start(nextAlgo, { beamWidth: settings.beamWidth });
+        setStarted(true);
+      }, 350);
+    } else if (isRunningAllRef.current) {
+      // All done.
+      setIsRunningAllSync(false);
+      runAllQueue.current = [];
     }
   }, [animationEnded]);
 
@@ -611,18 +661,26 @@ function Map() {
         settings={settings}
         setSettings={changeSettings}
         changeAlgorithm={changeAlgorithm}
-        colors={colors}
-        setColors={changeColors}
         loading={loading}
         placeEnd={placeEnd}
         setPlaceEnd={setPlaceEnd}
         changeRadius={changeRadius}
+        startRunAll={startRunAll}
+        isRunningAll={isRunningAll}
       />
       <MetricsSidebar
         metrics={metrics}
         visible={animationEnded || savedComparisons.length > 0}
         savedComparisons={savedComparisons}
         onClearComparisons={clearSavedComparisons}
+      />
+      <LiveHUD
+        visible={started && !animationEnded}
+        pathfinding={state}
+        algorithmKey={settings.algorithm}
+        isRunningAll={isRunningAll}
+        runAllIndex={runAllIndex}
+        runAllTotal={ALL_ALGORITHMS.length}
       />
     </>
   );

@@ -21,11 +21,10 @@ import {
   FormControl,
   Menu,
 } from "@mui/material";
-import { MuiColorInput } from "mui-color-input";
-import { PlayArrow, Settings, Pause, Replay } from "@mui/icons-material";
+import { PlayArrow, Settings, Pause, AllInclusive } from "@mui/icons-material";
 import Slider from "./Slider";
-import { INITIAL_COLORS, LOCATIONS } from "../config";
-import { arrayToRgb, rgbToArray } from "../helpers";
+import { LOCATIONS } from "../config";
+
 
 const Interface = forwardRef(
   (
@@ -37,7 +36,6 @@ const Interface = forwardRef(
       time,
       maxTime,
       settings,
-      colors,
       loading,
       timeChanged,
       placeEnd,
@@ -45,11 +43,12 @@ const Interface = forwardRef(
       changeAlgorithm,
       setPlaceEnd,
       setSettings,
-      setColors,
       startPathfinding,
       toggleAnimation,
       clearPath,
       changeLocation,
+      startRunAll,
+      isRunningAll,
     },
     ref,
   ) => {
@@ -159,6 +158,40 @@ const Interface = forwardRef(
               />
             )}
           </IconButton>
+          {/* Run All Algorithms button */}
+          <Tooltip title={isRunningAll ? "Running all algorithms…" : "Run all algorithms & compare"}>
+            <span>
+              <IconButton
+                disabled={!canStart || (started && !animationEnded) || isRunningAll}
+                onClick={startRunAll}
+                size="large"
+                sx={{
+                  width: 48,
+                  height: 48,
+                  backgroundColor: "#2A2B37",
+                  border: isRunningAll
+                    ? "1.5px solid rgba(70,183,128,0.7)"
+                    : "1px solid rgba(255,255,255,0.1)",
+                  transition: "border-color 0.3s",
+                  "&:hover": { backgroundColor: "#353648" },
+                  "&.Mui-disabled": { opacity: 0.4 },
+                }}
+              >
+                <AllInclusive
+                  sx={{
+                    color: isRunningAll ? "#46B780" : "#fff",
+                    width: 22,
+                    height: 22,
+                    animation: isRunningAll ? "spin 1.4s linear infinite" : "none",
+                    "@keyframes spin": {
+                      from: { transform: "rotate(0deg)" },
+                      to: { transform: "rotate(360deg)" },
+                    },
+                  }}
+                />
+              </IconButton>
+            </span>
+          </Tooltip>
           <div className="side">
             <Button
               disabled={!animationEnded && started}
@@ -474,191 +507,7 @@ const Interface = forwardRef(
               </div>
             )}
 
-            <div className="styles-container">
-              <Typography
-                style={{
-                  color: "#A8AFB3",
-                  textTransform: "uppercase",
-                  fontSize: 14,
-                }}
-              >
-                Styles
-              </Typography>
 
-              <div>
-                <Typography id="start-fill-label">
-                  Start node fill color
-                </Typography>
-                <div className="color-container">
-                  <MuiColorInput
-                    value={arrayToRgb(colors.startNodeFill)}
-                    onChange={(v) => {
-                      setColors({ ...colors, startNodeFill: rgbToArray(v) });
-                    }}
-                    aria-labelledby="start-fill-label"
-                    style={{ backgroundColor: "#404156" }}
-                  />
-                  <IconButton
-                    onClick={() => {
-                      setColors({
-                        ...colors,
-                        startNodeFill: INITIAL_COLORS.startNodeFill,
-                      });
-                    }}
-                    style={{ backgroundColor: "transparent" }}
-                    size="small"
-                  >
-                    <Replay
-                      style={{ color: "#fff", width: 20, height: 20 }}
-                      fontSize="inherit"
-                    />
-                  </IconButton>
-                </div>
-              </div>
-
-              <div>
-                <Typography id="start-border-label">
-                  Start node border color
-                </Typography>
-                <div className="color-container">
-                  <MuiColorInput
-                    value={arrayToRgb(colors.startNodeBorder)}
-                    onChange={(v) => {
-                      setColors({ ...colors, startNodeBorder: rgbToArray(v) });
-                    }}
-                    aria-labelledby="start-border-label"
-                    style={{ backgroundColor: "#404156" }}
-                  />
-                  <IconButton
-                    onClick={() => {
-                      setColors({
-                        ...colors,
-                        startNodeBorder: INITIAL_COLORS.startNodeBorder,
-                      });
-                    }}
-                    style={{ backgroundColor: "transparent" }}
-                    size="small"
-                  >
-                    <Replay
-                      style={{ color: "#fff", width: 20, height: 20 }}
-                      fontSize="inherit"
-                    />
-                  </IconButton>
-                </div>
-              </div>
-
-              <div>
-                <Typography id="end-fill-label">End node fill color</Typography>
-                <div className="color-container">
-                  <MuiColorInput
-                    value={arrayToRgb(colors.endNodeFill)}
-                    onChange={(v) => {
-                      setColors({ ...colors, endNodeFill: rgbToArray(v) });
-                    }}
-                    aria-labelledby="end-fill-label"
-                    style={{ backgroundColor: "#404156" }}
-                  />
-                  <IconButton
-                    onClick={() => {
-                      setColors({
-                        ...colors,
-                        endNodeFill: INITIAL_COLORS.endNodeFill,
-                      });
-                    }}
-                    style={{ backgroundColor: "transparent" }}
-                    size="small"
-                  >
-                    <Replay
-                      style={{ color: "#fff", width: 20, height: 20 }}
-                      fontSize="inherit"
-                    />
-                  </IconButton>
-                </div>
-              </div>
-
-              <div>
-                <Typography id="end-border-label">
-                  End node border color
-                </Typography>
-                <div className="color-container">
-                  <MuiColorInput
-                    value={arrayToRgb(colors.endNodeBorder)}
-                    onChange={(v) => {
-                      setColors({ ...colors, endNodeBorder: rgbToArray(v) });
-                    }}
-                    aria-labelledby="end-border-label"
-                    style={{ backgroundColor: "#404156" }}
-                  />
-                  <IconButton
-                    onClick={() => {
-                      setColors({
-                        ...colors,
-                        endNodeBorder: INITIAL_COLORS.endNodeBorder,
-                      });
-                    }}
-                    style={{ backgroundColor: "transparent" }}
-                    size="small"
-                  >
-                    <Replay
-                      style={{ color: "#fff", width: 20, height: 20 }}
-                      fontSize="inherit"
-                    />
-                  </IconButton>
-                </div>
-              </div>
-
-              <div>
-                <Typography id="path-label">Path color</Typography>
-                <div className="color-container">
-                  <MuiColorInput
-                    value={arrayToRgb(colors.path)}
-                    onChange={(v) => {
-                      setColors({ ...colors, path: rgbToArray(v) });
-                    }}
-                    aria-labelledby="path-label"
-                    style={{ backgroundColor: "#404156" }}
-                  />
-                  <IconButton
-                    onClick={() => {
-                      setColors({ ...colors, path: INITIAL_COLORS.path });
-                    }}
-                    style={{ backgroundColor: "transparent" }}
-                    size="small"
-                  >
-                    <Replay
-                      style={{ color: "#fff", width: 20, height: 20 }}
-                      fontSize="inherit"
-                    />
-                  </IconButton>
-                </div>
-              </div>
-
-              <div>
-                <Typography id="route-label">Shortest route color</Typography>
-                <div className="color-container">
-                  <MuiColorInput
-                    value={arrayToRgb(colors.route)}
-                    onChange={(v) => {
-                      setColors({ ...colors, route: rgbToArray(v) });
-                    }}
-                    aria-labelledby="route-label"
-                    style={{ backgroundColor: "#404156" }}
-                  />
-                  <IconButton
-                    onClick={() => {
-                      setColors({ ...colors, route: INITIAL_COLORS.route });
-                    }}
-                    style={{ backgroundColor: "transparent" }}
-                    size="small"
-                  >
-                    <Replay
-                      style={{ color: "#fff", width: 20, height: 20 }}
-                      fontSize="inherit"
-                    />
-                  </IconButton>
-                </div>
-              </div>
-            </div>
 
             <div className="shortcuts-container">
               <Typography
